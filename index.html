@@ -283,19 +283,6 @@
         <input type="text" id="topicInput" placeholder="مثال: قانون الجذب، الإنتاجية، الوعي الذاتي..." />
       </div>
 
-      <div class="field" id="apiKeyField">
-        <label>مفتاح Anthropic API</label>
-        <div class="key-row">
-          <input type="password" id="apiKeyInput" placeholder="sk-ant-..." />
-          <button onclick="saveKey()">حفظ</button>
-        </div>
-        <div class="key-hint">
-          احصل على المفتاح من
-          <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>
-        </div>
-        <div class="key-saved" id="keySaved">✓ تم الحفظ في المتصفح</div>
-      </div>
-
       <button class="btn-generate" id="generateBtn" onclick="generate()">
         ✨ ولّد كاروسيل هذا الأسبوع
       </button>
@@ -325,29 +312,8 @@
       cta:     ['📣 CTA',   'badge-cta'],
     };
 
-    // Load saved key on start
-    window.addEventListener('DOMContentLoaded', () => {
-      const saved = localStorage.getItem('anthropic_key');
-      if (saved) {
-        document.getElementById('apiKeyInput').value = saved;
-        document.getElementById('keySaved').style.display = 'block';
-      }
-    });
-
-    function saveKey() {
-      const key = document.getElementById('apiKeyInput').value.trim();
-      if (key) {
-        localStorage.setItem('anthropic_key', key);
-        const el = document.getElementById('keySaved');
-        el.style.display = 'block';
-        setTimeout(() => el.style.display = 'none', 3000);
-      }
-    }
-
     async function generate() {
-      const topic  = document.getElementById('topicInput').value.trim();
-      const apiKey = document.getElementById('apiKeyInput').value.trim()
-                  || localStorage.getItem('anthropic_key') || '';
+      const topic = document.getElementById('topicInput').value.trim();
 
       // Reset UI
       document.getElementById('errorBox').classList.remove('show');
@@ -359,7 +325,7 @@
         const res = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic: topic || null, apiKey }),
+          body: JSON.stringify({ topic: topic || null }),
         });
 
         const data = await res.json();
