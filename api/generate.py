@@ -79,7 +79,7 @@ class handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length)) if length else {}
 
-            topic = body.get("topic", "").strip() or None
+            topic = (body.get("topic") or "").strip() or None
             api_key = os.getenv("ANTHROPIC_API_KEY") or body.get("apiKey", "")
 
             if not api_key:
