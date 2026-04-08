@@ -80,7 +80,7 @@ class handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length)) if length else {}
 
             topic = (body.get("topic") or "").strip() or None
-            api_key = os.getenv("ANTHROPIC_API_KEY") or body.get("apiKey", "")
+            api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
 
             if not api_key:
                 self._json(400, {"error": "ANTHROPIC_API_KEY غير موجود — أضفه في إعدادات Vercel أو أدخله في الصفحة"})
