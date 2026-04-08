@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>مولّد الكاروسيل — حمد الفيلكاوي</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0d;
+      --card: #1a1a1a;
+      --border: #2a2a2a;
+      --accent: #7c3aed;
+      --accent2: #a855f7;
+      --text: #f0f0f0;
+      --muted: #888;
+      --success: #22c55e;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, 'Arial', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px 16px 60px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+      padding-top: 20px;
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #a855f7, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+    }
+    header p { color: var(--muted); font-size: 0.95rem; }
+
+    .container { max-width: 680px; margin: 0 auto; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      background: #111;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: var(--text);
+      font-size: 1rem;
+      font-family: inherit;
+      direction: rtl;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus { border-color: var(--accent); }
+    input::placeholder { color: #444; }
+
+    .field { margin-bottom: 18px; }
+
+    .key-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    .key-row input { flex: 1; }
+    .key-row button {
+      flex-shrink: 0;
+      padding: 12px 18px;
+      background: #222;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .key-row button:hover { border-color: var(--accent); color: var(--text); }
+
+    .key-hint {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    .key-hint a { color: var(--accent2); text-decoration: none; }
+
+    .key-saved {
+      display: none;
+      font-size: 0.8rem;
+      color: var(--success);
+      margin-top: 6px;
+    }
+
+    .btn-generate {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, var(--accent), #3b82f6);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      letter-spacing: 0.02em;
+    }
+    .btn-generate:hover { opacity: 0.9; }
+    .btn-generate:active { transform: scale(0.98); }
+    .btn-generate:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Loading */
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 40px 0;
+    }
+    .loading.show { display: block; }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading p { color: var(--muted); font-size: 0.95rem; }
+
+    /* Error */
+    .error-box {
+      display: none;
+      background: #2d1515;
+      border: 1px solid #7f1d1d;
+      border-radius: 12px;
+      padding: 16px 20px;
+      color: #fca5a5;
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+      direction: rtl;
+    }
+    .error-box.show { display: block; }
+
+    /* Results */
+    #results { display: none; }
+    #results.show { display: block; }
+
+    .topic-title {
+      text-align: center;
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 24px;
+      padding: 16px;
+      background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(59,130,246,0.15));
+      border: 1px solid rgba(124,58,237,0.3);
+      border-radius: 12px;
+    }
+
+    .slides-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .slide-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      position: relative;
+      transition: border-color 0.2s;
+    }
+    .slide-card:hover { border-color: #3a3a3a; }
+
+    .slide-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .slide-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+    .badge-hook  { background: rgba(234,179,8,0.15);  color: #fbbf24; border: 1px solid rgba(234,179,8,0.3); }
+    .badge-content { background: rgba(124,58,237,0.15); color: #a78bfa; border: 1px solid rgba(124,58,237,0.3); }
+    .badge-cta   { background: rgba(34,197,94,0.15);  color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+
+    .slide-num {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .slide-text {
+      font-size: 1rem;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      direction: rtl;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: #222;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+    .copy-btn:hover { color: var(--text); border-color: #444; }
+    .copy-btn.copied { color: var(--success); border-color: var(--success); }
+
+    .copy-all-btn {
+      width: 100%;
+      margin-top: 20px;
+      padding: 13px;
+      background: #1a1a1a;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .copy-all-btn:hover { border-color: var(--accent); color: var(--accent2); }
+
+    @media (max-width: 480px) {
+      header h1 { font-size: 1.5rem; }
+      .copy-btn { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🚀 مولّد الكاروسيل</h1>
+      <p>@hamad_failakawi — كاروسيل إنستقرام أسبوعي بضغطة زر</p>
+    </header>
+
+    <!-- Form Card -->
+    <div class="card">
+      <div class="field">
+        <label>الموضوع (اختياري)</label>
+        <input type="text" id="topicInput" placeholder="مثال: قانون الجذب، الإنتاجية، الوعي الذاتي..." />
+      </div>
+
+      <div class="field" id="apiKeyField">
+        <label>مفتاح Anthropic API</label>
+        <div class="key-row">
+          <input type="password" id="apiKeyInput" placeholder="sk-ant-..." />
+          <button onclick="saveKey()">حفظ</button>
+        </div>
+        <div class="key-hint">
+          احصل على المفتاح من
+          <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>
+        </div>
+        <div class="key-saved" id="keySaved">✓ تم الحفظ في المتصفح</div>
+      </div>
+
+      <button class="btn-generate" id="generateBtn" onclick="generate()">
+        ✨ ولّد كاروسيل هذا الأسبوع
+      </button>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <p>جاري توليد المحتوى...</p>
+    </div>
+
+    <!-- Error -->
+    <div class="error-box" id="errorBox"></div>
+
+    <!-- Results -->
+    <div id="results">
+      <div class="topic-title" id="topicTitle"></div>
+      <div class="slides-grid" id="slidesGrid"></div>
+      <button class="copy-all-btn" onclick="copyAll()">📋 نسخ كل الكاروسيل</button>
+    </div>
+  </div>
+
+  <script>
+    const BADGE = {
+      hook:    ['🎯 كفر',    'badge-hook'],
+      content: ['💡 محتوى', 'badge-content'],
+      cta:     ['📣 CTA',   'badge-cta'],
+    };
+
+    // Load saved key on start
+    window.addEventListener('DOMContentLoaded', () => {
+      const saved = localStorage.getItem('anthropic_key');
+      if (saved) {
+        document.getElementById('apiKeyInput').value = saved;
+        document.getElementById('keySaved').style.display = 'block';
+      }
+    });
+
+    function saveKey() {
+      const key = document.getElementById('apiKeyInput').value.trim();
+      if (key) {
+        localStorage.setItem('anthropic_key', key);
+        const el = document.getElementById('keySaved');
+        el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 3000);
+      }
+    }
+
+    async function generate() {
+      const topic  = document.getElementById('topicInput').value.trim();
+      const apiKey = document.getElementById('apiKeyInput').value.trim()
+                  || localStorage.getItem('anthropic_key') || '';
+
+      // Reset UI
+      document.getElementById('errorBox').classList.remove('show');
+      document.getElementById('results').classList.remove('show');
+      document.getElementById('loading').classList.add('show');
+      document.getElementById('generateBtn').disabled = true;
+
+      try {
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic: topic || null, apiKey }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || `خطأ ${res.status}`);
+        }
+
+        renderResults(data);
+      } catch (err) {
+        const box = document.getElementById('errorBox');
+        box.textContent = '❌ ' + err.message;
+        box.classList.add('show');
+      } finally {
+        document.getElementById('loading').classList.remove('show');
+        document.getElementById('generateBtn').disabled = false;
+      }
+    }
+
+    function renderResults(data) {
+      document.getElementById('topicTitle').textContent = '📌 ' + data.topic;
+
+      const grid = document.getElementById('slidesGrid');
+      grid.innerHTML = '';
+
+      data.slides.forEach(slide => {
+        const [label, badgeClass] = BADGE[slide.type] || ['•', 'badge-content'];
+
+        const card = document.createElement('div');
+        card.className = 'slide-card';
+        card.innerHTML = `
+          <div class="slide-header">
+            <span class="slide-badge ${badgeClass}">${label}</span>
+            <span class="slide-num">سلايد ${slide.num}</span>
+          </div>
+          <p class="slide-text">${escHtml(slide.text)}</p>
+          <button class="copy-btn" onclick="copySlide(this, ${JSON.stringify(slide.text)})">نسخ</button>
+        `;
+        grid.appendChild(card);
+      });
+
+      document.getElementById('results').classList.add('show');
+      document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function copySlide(btn, text) {
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = '✓ تم';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'نسخ'; btn.classList.remove('copied'); }, 2000);
+      });
+    }
+
+    function copyAll() {
+      const slides = document.querySelectorAll('.slide-text');
+      const text = Array.from(slides).map((el, i) => `[سلايد ${i+1}]\n${el.textContent}`).join('\n\n');
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.querySelector('.copy-all-btn');
+        btn.textContent = '✓ تم النسخ!';
+        setTimeout(() => btn.textContent = '📋 نسخ كل الكاروسيل', 2500);
+      });
+    }
+  </script>
+</body>
+</html>
