@@ -17,6 +17,8 @@
       --muted: #888;
       --success: #22c55e;
       --warn: #f59e0b;
+      --sheets: #1a7340;
+      --sheets-hover: #22c55e;
     }
 
     body {
@@ -189,6 +191,50 @@
     }
     .btn-clear-corrections:hover { border-color: #7f1d1d; color: #fca5a5; }
 
+    .btn-sheets {
+      flex: 1;
+      padding: 13px;
+      border-radius: 12px;
+      font-size: 0.92rem; font-weight: 600; font-family: inherit;
+      cursor: pointer; transition: all 0.2s;
+      background: rgba(26,115,64,0.15);
+      border: 1px solid rgba(34,197,94,0.35);
+      color: #4ade80;
+    }
+    .btn-sheets:hover { background: rgba(26,115,64,0.28); border-color: #4ade80; }
+    .btn-sheets:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Sheets URL modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75); z-index: 100;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: #1a1a1a; border: 1px solid #2a2a2a;
+      border-radius: 16px; padding: 28px; width: 100%; max-width: 500px;
+    }
+    .modal h3 { margin-bottom: 8px; font-size: 1.1rem; }
+    .modal p  { color: var(--muted); font-size: 0.85rem; margin-bottom: 18px; line-height: 1.6; }
+    .modal input {
+      width: 100%; background: #111; border: 1px solid var(--border);
+      border-radius: 10px; padding: 11px 14px; color: var(--text);
+      font-size: 0.88rem; font-family: inherit; direction: ltr;
+      outline: none; margin-bottom: 14px;
+    }
+    .modal input:focus { border-color: var(--accent); }
+    .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+    .modal-btns button {
+      padding: 9px 20px; border-radius: 9px; font-size: 0.88rem;
+      font-family: inherit; cursor: pointer; border: 1px solid var(--border);
+    }
+    .modal-confirm {
+      background: linear-gradient(135deg, var(--accent), #3b82f6);
+      color: #fff; border-color: transparent;
+    }
+    .modal-cancel { background: #222; color: var(--muted); }
+
     @media (max-width: 480px) {
       header h1 { font-size: 1.5rem; }
     }
@@ -227,8 +273,25 @@
       <div class="slides-grid" id="slidesGrid"></div>
       <div class="bottom-bar">
         <button class="btn-copy-all" onclick="copyAll()">📋 نسخ كل الكاروسيل</button>
+        <button class="btn-sheets" id="sheetsBtn" onclick="sendToSheets()">📊 نقل إلى Sheets</button>
         <button class="btn-clear-corrections" id="clearBtn"
           onclick="clearCorrections()" style="display:none">🗑 مسح التصحيحات</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sheets URL Modal -->
+  <div class="modal-overlay" id="sheetsModal">
+    <div class="modal">
+      <h3>📊 إعداد Google Sheets</h3>
+      <p>
+        لازم تنشر Apps Script أول مرة فقط.<br>
+        اتبع الخطوات في ملف <code>docs/apps_script.js</code> ثم الصق الـ URL هنا.
+      </p>
+      <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec" />
+      <div class="modal-btns">
+        <button class="modal-cancel" onclick="closeModal()">إلغاء</button>
+        <button class="modal-confirm" onclick="confirmSendToSheets()">إرسال ✓</button>
       </div>
     </div>
   </div>
@@ -430,6 +493,70 @@
       return String(s)
         .replace(/&/g,'&amp;').replace(/</g,'&lt;')
         .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /* ── Google Sheets ── */
+    const SCRIPT_URL_KEY = 'hamad_script_url';
+
+    function sendToSheets() {
+      const saved = localStorage.getItem(SCRIPT_URL_KEY);
+      if (saved) {
+        doSendToSheets(saved);
+      } else {
+        document.getElementById('sheetsModal').classList.add('show');
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('sheetsModal').classList.remove('show');
+    }
+
+    function confirmSendToSheets() {
+      const url = document.getElementById('scriptUrlInput').value.trim();
+      if (!url.startsWith('https://script.google.com')) {
+        alert('الرابط غير صحيح — تأكد من نسخ رابط Web App الصحيح');
+        return;
+      }
+      localStorage.setItem(SCRIPT_URL_KEY, url);
+      closeModal();
+      doSendToSheets(url);
+    }
+
+    async function doSendToSheets(scriptUrl) {
+      const btn = document.getElementById('sheetsBtn');
+      const topic = document.getElementById('topicTitle').textContent.replace('📌 ', '');
+
+      // اجمع السلايدات الحالية (بعد أي تعديل)
+      const cards = document.querySelectorAll('.slide-card');
+      const slides = Array.from(cards).map((card, i) => ({
+        num:  i + 1,
+        type: i === 0 ? 'hook' : i === 5 ? 'cta' : 'content',
+        text: card.querySelector('.slide-text').textContent,
+      }));
+
+      btn.textContent = '⏳ جاري النقل...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(scriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ topic, slides }),
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          btn.textContent = '✅ تم النقل!';
+          setTimeout(() => { btn.textContent = '📊 نقل إلى Sheets'; btn.disabled = false; }, 3000);
+        } else {
+          throw new Error(data.message || 'خطأ غير معروف');
+        }
+      } catch (err) {
+        alert('❌ فشل النقل: ' + err.message + '\n\nتحقق من رابط Apps Script أو أعد نشره.');
+        // أزل الرابط المحفوظ لو في خطأ
+        localStorage.removeItem(SCRIPT_URL_KEY);
+        btn.textContent = '📊 نقل إلى Sheets';
+        btn.disabled = false;
+      }
     }
 
     // تحديث الـ badge عند تحميل الصفحة
