@@ -331,30 +331,61 @@
       content: ['💡 محتوى','badge-content'],
       cta:     ['📣 CTA',  'badge-cta'],
     };
-    const STORAGE_KEY = 'hamad_corrections';
 
-    /* ── Corrections storage ── */
-    function getCorrections() {
-      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-      catch { return []; }
-    }
-    function saveCorrection(original, corrected) {
-      const list = getCorrections();
-      // أزل لو نفس النص الأصلي موجود مسبقاً
-      const filtered = list.filter(c => c.original !== original);
-      filtered.push({ original, corrected, ts: Date.now() });
-      // احتفظ بآخر 20 تصحيح
-      const trimmed = filtered.slice(-20);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+    /* ── Corrections — server-first, localStorage as fallback ── */
+    let _corrections = [];   // الكاش في الذاكرة
+
+    async function loadCorrections() {
+      try {
+        const res = await fetch('/api/corrections');
+        if (res.ok) {
+          _corrections = await res.json();
+          // لو الـ array وصل صح، تجاهل localStorage القديم
+        } else {
+          throw new Error('server error');
+        }
+      } catch {
+        // fallback: localStorage
+        try { _corrections = JSON.parse(localStorage.getItem('hamad_corrections') || '[]'); }
+        catch { _corrections = []; }
+      }
       updateBadge();
     }
+
+    function getCorrections() { return _corrections; }
+
+    async function saveCorrection(original, corrected) {
+      const entry = { original, corrected, ts: Date.now() };
+      try {
+        const res = await fetch('/api/corrections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(entry),
+        });
+        if (res.ok) {
+          // أعد التحميل من السيرفر عشان الكاش يتحدث
+          await loadCorrections();
+          return;
+        }
+      } catch { /* fallthrough */ }
+      // fallback: localStorage
+      _corrections = _corrections.filter(c => c.original !== original);
+      _corrections.push(entry);
+      _corrections = _corrections.slice(-20);
+      localStorage.setItem('hamad_corrections', JSON.stringify(_corrections));
+      updateBadge();
+    }
+
     function clearCorrections() {
       if (!confirm('تحذف كل التصحيحات المحفوظة؟')) return;
-      localStorage.removeItem(STORAGE_KEY);
+      // مسح محلي فقط — الحذف من GitHub يتم يدوياً لو احتجت
+      _corrections = [];
+      localStorage.removeItem('hamad_corrections');
       updateBadge();
     }
+
     function updateBadge() {
-      const list = getCorrections();
+      const list = _corrections;
       const badge = document.getElementById('correctionsBadge');
       const clearBtn = document.getElementById('clearBtn');
       if (list.length > 0) {
@@ -366,9 +397,9 @@
         clearBtn.style.display = 'none';
       }
     }
+
     function showCorrectionsInfo() {
-      const list = getCorrections();
-      alert(`عندك ${list.length} تصحيح محفوظ.\nكل مرة تولّد كاروسيل، هالتصحيحات تُرسل لـ Claude عشان يتعلم أسلوبك.`);
+      alert(`عندك ${_corrections.length} تصحيح محفوظ في GitHub.\nكل مرة تولّد كاروسيل، هالتصحيحات تُرسل لـ Claude عشان يتعلم أسلوبك.`);
     }
 
     /* ── Generate ── */
@@ -496,7 +527,7 @@
         return;
       }
 
-      // احفظ التصحيح
+      // احفظ التصحيح (async — لا نحتاج نانتظرها عشان نحدث العرض)
       saveCorrection(original, corrected);
 
       // حدّث العرض
@@ -606,8 +637,8 @@
       }
     }
 
-    // تحديث الـ badge عند تحميل الصفحة
-    updateBadge();
+    // تحميل التصحيحات من السيرفر عند فتح الصفحة
+    loadCorrections();
   </script>
 </body>
 </html>
