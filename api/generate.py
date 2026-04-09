@@ -1,10 +1,11 @@
 from http.server import BaseHTTPRequestHandler
 import json
 import os
+import random
 import urllib.request
 import urllib.error
 
-# ─── قراءة ملف الأسلوب ───────────────────────────────────────
+# --- قراءة ملف الأسلوب ---
 def load_style_guide() -> str:
     style_path = os.path.join(os.path.dirname(__file__), "..", "config", "style_corrections.md")
     try:
@@ -13,13 +14,42 @@ def load_style_guide() -> str:
     except Exception:
         return ""
 
+# --- أنماط بنية متنوعة ---
+HOOK_PATTERNS = [
+    {
+        "id": "personal_story",
+        "hook_desc": "ابدأ بقصة شخصية مباشرة (يوم من الأيام أنا... / كان عمري...) تكشف الموضوع",
+        "content_desc": 'كل سلايد: درس واحد مستخلص من التجربة + جملة قوية بين ""',
+    },
+    {
+        "id": "shocking_fact",
+        "hook_desc": "ابدأ بمعلومة صادمة أو رقم غير متوقع عن الموضوع، ثم اربطها بتجربتك أو بتجربة عميل",
+        "content_desc": 'كل سلايد: خطأ شائع أو سوء فهم + الحقيقة المعاكسة بجملة بين ""',
+    },
+    {
+        "id": "direct_challenge",
+        "hook_desc": 'ابدأ بسؤال تحدي مباشر للقارئ ("وين أنت الحين؟" / "شتسوي لو...؟") — مو قصة، بل استفزاز لطيف',
+        "content_desc": 'كل سلايد: خطوة عملية واحدة ممكن يسويها القارئ اليوم + جملة تحفيزية بين ""',
+    },
+    {
+        "id": "before_after",
+        "hook_desc": "ابدأ بمقارنة حادة بين 'قبل' و'بعد' — أنت أو أحد عملائك — في سطرين فقط",
+        "content_desc": 'كل سلايد: عامل تحول واحد بين الحالتين + جملة تلخص الفكرة بين ""',
+    },
+    {
+        "id": "controversial_opinion",
+        "hook_desc": "ابدأ برأي مختلف أو مفاجئ عن الموضوع يخالف ما يعتقده الناس — بنبرة واثقة",
+        "content_desc": 'كل سلايد: دليل أو حجة تدعم هالرأي + جملة جريئة بين ""',
+    },
+]
+
 SYSTEM_PROMPT_BASE = """أنت كاتب محتوى متخصص بأسلوب حمد الفيلكاوي (@hamad_failakawi).
 
 {style_guide}
 
 قواعد الكتابة الصارمة:
-1. الكفر (سلايد 1): قصة شخصية قصيرة + كشف الموضوع باسمه
-2. السلايدات 2-5: كل سلايد فكرة واحدة + جملة قوية بين ""
+1. الكفر (سلايد 1): {hook_desc}
+2. السلايدات 2-5: {content_desc}
 3. السلايد 6 (CTA): ينتهي دائماً بـ: اكتبلي (ارسل) بالتعليقات وراح ارسل لك رابط التحدي
 4. لغة: عامية كويتية/خليجية، جمل قصيرة، نبرة مباشرة
 5. لا هاشتاقات
@@ -52,11 +82,21 @@ def build_corrections_block(corrections: list) -> str:
     return "\n".join(lines) + "\n\n"
 
 
-def generate_content(api_key: str, topic: str = None, corrections: list = None) -> dict:
+def generate_content(api_key: str, topic: str = None, corrections: list = None, pattern_id: str = None) -> dict:
     style_guide = load_style_guide()
 
+    # اختيار نمط البنية — إما محدد من الطلب أو عشوائي
+    if pattern_id:
+        pattern = next((p for p in HOOK_PATTERNS if p["id"] == pattern_id), None)
+    else:
+        pattern = None
+    if not pattern:
+        pattern = random.choice(HOOK_PATTERNS)
+
     system_prompt = SYSTEM_PROMPT_BASE.format(
-        style_guide=f"--- دليل الأسلوب ---\n{style_guide}\n---\n" if style_guide else ""
+        style_guide=f"--- دليل الأسلوب ---\n{style_guide}\n---\n" if style_guide else "",
+        hook_desc=pattern["hook_desc"],
+        content_desc=pattern["content_desc"],
     )
 
     if topic:
@@ -98,7 +138,9 @@ def generate_content(api_key: str, topic: str = None, corrections: list = None) 
     text = result["content"][0]["text"]
     start = text.find("{")
     end = text.rfind("}") + 1
-    return json.loads(text[start:end])
+    data = json.loads(text[start:end])
+    data["pattern_id"] = pattern["id"]
+    return data
 
 
 class handler(BaseHTTPRequestHandler):
@@ -114,13 +156,14 @@ class handler(BaseHTTPRequestHandler):
 
             topic       = (body.get("topic") or "").strip() or None
             corrections = body.get("corrections") or []
+            pattern_id  = body.get("pattern_id") or None
             api_key     = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
 
             if not api_key:
                 self._json(400, {"error": "ANTHROPIC_API_KEY غير موجود في إعدادات الخادم"})
                 return
 
-            data = generate_content(api_key, topic, corrections)
+            data = generate_content(api_key, topic, corrections, pattern_id)
             self._json(200, data)
 
         except urllib.error.HTTPError as e:

@@ -58,7 +58,25 @@
     }
     input:focus { border-color: var(--accent); }
     input::placeholder { color: #444; }
+
+    select {
+      width: 100%; background: #111; border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 16px; color: var(--text);
+      font-size: 0.95rem; font-family: inherit; direction: rtl;
+      transition: border-color 0.2s; outline: none; cursor: pointer;
+      appearance: none;
+    }
+    select:focus { border-color: var(--accent); }
+    select option { background: #1a1a1a; }
+
     .field { margin-bottom: 18px; }
+
+    .pattern-tag {
+      display: inline-block; font-size: 0.78rem; padding: 3px 10px;
+      border-radius: 20px; background: rgba(59,130,246,0.12);
+      border: 1px solid rgba(59,130,246,0.3); color: #93c5fd;
+      margin-bottom: 16px;
+    }
 
     .btn-generate {
       width: 100%; padding: 15px;
@@ -253,6 +271,17 @@
         <input type="text" id="topicInput"
           placeholder="مثال: قانون الجذب، الإنتاجية، الوعي الذاتي..." />
       </div>
+      <div class="field">
+        <label>نمط الكفر (اختياري — افتراضي: عشوائي)</label>
+        <select id="patternSelect">
+          <option value="">🎲 عشوائي (موصى به)</option>
+          <option value="personal_story">📖 قصة شخصية</option>
+          <option value="shocking_fact">💥 معلومة صادمة</option>
+          <option value="direct_challenge">🎯 تحدي مباشر للقارئ</option>
+          <option value="before_after">⚡ قبل وبعد</option>
+          <option value="controversial_opinion">🔥 رأي مخالف للتيار</option>
+        </select>
+      </div>
       <button class="btn-generate" id="generateBtn" onclick="generate()">
         ✨ ولّد كاروسيل هذا الأسبوع
       </button>
@@ -346,6 +375,7 @@
     async function generate() {
       const topic       = document.getElementById('topicInput').value.trim();
       const corrections = getCorrections();
+      const pattern_id  = document.getElementById('patternSelect').value || null;
 
       document.getElementById('errorBox').classList.remove('show');
       document.getElementById('results').classList.remove('show');
@@ -356,7 +386,7 @@
         const res = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic: topic || null, corrections }),
+          body: JSON.stringify({ topic: topic || null, corrections, pattern_id }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `خطأ ${res.status}`);
@@ -371,11 +401,28 @@
       }
     }
 
+    const PATTERN_LABELS = {
+      personal_story:       '📖 قصة شخصية',
+      shocking_fact:        '💥 معلومة صادمة',
+      direct_challenge:     '🎯 تحدي مباشر',
+      before_after:         '⚡ قبل وبعد',
+      controversial_opinion:'🔥 رأي مخالف',
+    };
+
     /* ── Render ── */
     function renderResults(data) {
       document.getElementById('topicTitle').textContent = '📌 ' + data.topic;
+
       const grid = document.getElementById('slidesGrid');
       grid.innerHTML = '';
+
+      // أظهر تاق النمط المستخدم
+      if (data.pattern_id) {
+        const tag = document.createElement('div');
+        tag.className = 'pattern-tag';
+        tag.textContent = 'نمط الكفر: ' + (PATTERN_LABELS[data.pattern_id] || data.pattern_id);
+        grid.appendChild(tag);
+      }
 
       data.slides.forEach(slide => {
         const [label, badgeClass] = BADGE[slide.type] || ['•', 'badge-content'];
